@@ -7,22 +7,49 @@ require './config.rb'
 require 'net/http'
 require 'uri'
 require 'net/http/post/multipart'
+require 'rubygems'	#required by nokogiri
+require 'nokogiri'
 
 INPUT_FILENAME = ARGV[0]
 INPUT_DESCRIPTION = ARGV[1]
 OUTPUT_FILENAME = ARGV[2]
 
 def uptobox
+	uptoboxType('uptobox.com')
+end
+
+def jumbofiles
+	#uptoboxType('jumbofiles.com')
+	# bug on www148, falling back to this one, which seems to work better.
+	uptoboxType2('jumbofiles.com', 'www159.jumbofiles.com')
+end
+
+def uptoboxType(domain)
 	# log in
 	# not needed for uploads under 1024 MB
 
 	# fetch the front page
-	#url = URI.parse('http://uptobox.com/')
-	#req = Net::HTTP::Get.new(url.path)
-	#res = Net::HTTP.start(url.host, url.port) { |http|
-	#	http.request(req)
-	#}
+	url = URI.parse("http://#{domain}/")
+	req = Net::HTTP::Get.new(url.path)
+	res = Net::HTTP.start(url.host, url.port) { |http|
+		http.request(req)
+	}
 	#puts res.body
+	# parse page, find wwwNumber.
+	doc = Nokogiri::HTML(res.body)
+
+	doc.xpath('//form').each do |form|
+		if(form.attribute('name').value == 'file')
+			url = form.attribute('action').value
+			uri = URI.parse(url)
+			p uri
+			p uri.host
+			uptoboxType2(domain, uri.host)
+		end
+	end
+end
+
+def uptoboxType2(baseDomain, uploadDomain)
 
 	# send file by POST
 
@@ -32,14 +59,14 @@ def uptobox
 		rando << rand(10).to_s
 	end
 
-	url = "http://www8.uptobox.com/cgi-bin/upload.cgi?upload_id=#{rando}&js_on=0&utype=reg&upload_type=file"
+	url = "http://#{uploadDomain}/cgi-bin/upload.cgi?upload_id=#{rando}&js_on=0&utype=anon&upload_type=file"
 	puts url
 	uri = URI.parse(url)
 	File.open(INPUT_FILENAME) do |file|
 		req = Net::HTTP::Post::Multipart.new(uri.path,
 			'upload_type' => 'file',
 			'sess_id' => '',
-			'srv_tmp_url' => 'http://www8.uptobox.com/tmp',
+			'srv_tmp_url' => "http://#{uploadDomain}/tmp",
 			'file_1' => UploadIO.new(file, 'application/octet-stream', INPUT_FILENAME),
 			'file_1_descr' => INPUT_DESCRIPTION,
 			'tos' => '1',
@@ -56,7 +83,7 @@ def uptobox
 		# parse url, get filename
 		i = resultUrl.index('fn=') + 3
 		id = resultUrl[i .. resultUrl.index('&', i)-1]
-		finalUrl = 'http://uptobox.com/' + id
+		finalUrl = "http://#{baseDomain}/#{id}"
 		puts finalUrl
 		File.open(OUTPUT_FILENAME, 'a') do |file|
 			file.puts finalUrl
@@ -65,3 +92,4 @@ def uptobox
 end
 
 uptobox
+jumbofiles
