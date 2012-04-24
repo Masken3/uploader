@@ -114,7 +114,7 @@ def coolshare
 	# send file by POST
 
 	puts url
-			uri = URI.parse(url)
+	uri = URI.parse(url)
 	File.open(INPUT_FILENAME) do |file|
 		req = Net::HTTP::Post::Multipart.new(uri.path,
 			'soubor' => UploadIO.new(file, 'application/octet-stream', INPUT_FILENAME),
@@ -127,7 +127,7 @@ def coolshare
 		p res
 		p res.to_hash()
 		p res.body
-		# parse body, get filename
+		# parse body, get address
 		key = '/upload-dokoncen/'
 		i = res.body.index(key) + key.length
 		id = res.body[i .. res.body.index('-', i)-1]
@@ -135,6 +135,43 @@ def coolshare
 	end
 end
 
+def rapidshare
+	# get nextuploadserver.
+	uri = URI.parse('http://api.rapidshare.com/cgi-bin/rsapi.cgi?sub=nextuploadserver')
+	puts uri
+	req = Net::HTTP::Get.new(uri.request_uri)
+	res = Net::HTTP.start(uri.host, uri.port) { |http|
+		http.request(req)
+	}
+	p res
+	nus = res.body.strip
+
+	# upload.
+	url = "http://rs#{nus}.rapidshare.com/cgi-bin/rsapi.cgi"
+	puts url
+	uri = URI.parse(url)
+	File.open(INPUT_FILENAME) do |file|
+		req = Net::HTTP::Post::Multipart.new(uri.request_uri,
+			'sub' => 'upload',
+			'login' => CONFIG_RAPIDSHARE_LOGIN,
+			'password' => CONFIG_RAPIDSHARE_PASSWORD,
+			'filecontent' => UploadIO.new(file, 'application/octet-stream', INPUT_FILENAME),
+			)
+		res = Net::HTTP.start(uri.host, uri.port) do |http|
+			http.request(req)
+		end
+		p res
+		p res.to_hash()
+		p res.body
+		# parse body, get address
+		key = "COMPLETE\n"
+		i = res.body.index(key) + key.length
+		id = res.body[i .. res.body.index(',', i)-1]
+		outputUrl("https://rapidshare.com/files/#{id}/#{INPUT_FILENAME}")
+	end
+end
+
+rapidshare
 coolshare
 uptobox
 jumbofiles
