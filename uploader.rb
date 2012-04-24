@@ -49,6 +49,13 @@ def uptoboxType(domain)
 	end
 end
 
+def outputUrl(url)
+	puts url
+	File.open(OUTPUT_FILENAME, 'a') do |file|
+		file.puts url
+	end
+end
+
 def uptoboxType2(baseDomain, uploadDomain)
 
 	# send file by POST
@@ -83,13 +90,51 @@ def uptoboxType2(baseDomain, uploadDomain)
 		# parse url, get filename
 		i = resultUrl.index('fn=') + 3
 		id = resultUrl[i .. resultUrl.index('&', i)-1]
-		finalUrl = "http://#{baseDomain}/#{id}"
-		puts finalUrl
-		File.open(OUTPUT_FILENAME, 'a') do |file|
-			file.puts finalUrl
-		end
+		outputUrl("http://#{baseDomain}/#{id}")
 	end
 end
 
+def coolshare
+	# fetch the front page
+	url = URI.parse("http://www.coolshare.cz/")
+	req = Net::HTTP::Get.new(url.path)
+	res = Net::HTTP.start(url.host, url.port) { |http|
+		http.request(req)
+	}
+	#puts res.body
+	# parse page
+	doc = Nokogiri::HTML(res.body)
+	url = ''
+	doc.xpath('//form').each do |form|
+		if(form.attribute('id').value == 'nahrat-video-form')
+			url = form.attribute('action').value
+		end
+	end
+
+	# send file by POST
+
+	puts url
+			uri = URI.parse(url)
+	File.open(INPUT_FILENAME) do |file|
+		req = Net::HTTP::Post::Multipart.new(uri.path,
+			'soubor' => UploadIO.new(file, 'application/octet-stream', INPUT_FILENAME),
+			#'up_submit' => 'Uložit na server',
+			'uID' => '',
+			)
+		res = Net::HTTP.start(uri.host, uri.port) do |http|
+			http.request(req)
+		end
+		p res
+		p res.to_hash()
+		p res.body
+		# parse body, get filename
+		key = '/upload-dokoncen/'
+		i = res.body.index(key) + key.length
+		id = res.body[i .. res.body.index('-', i)-1]
+		outputUrl("http://www.coolshare.cz/stahnout/#{id}/")
+	end
+end
+
+coolshare
 uptobox
 jumbofiles
